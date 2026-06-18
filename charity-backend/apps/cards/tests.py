@@ -9,37 +9,52 @@ from apps.common.card_status import CardStatus
 from apps.common.masking import mask_iin, mask_phone
 
 from .models import FundraisingCard
+from .test_fixtures import (
+    ALT_RECIPIENT_IIN,
+    AUTHOR_IIN,
+    HIGH_RISK_IIN,
+    OTHER_AUTHOR_IIN,
+    RECIPIENT_IIN,
+    THIRD_RECIPIENT_IIN,
+    seed_fundraiser_iin_fixtures,
+)
 
 User = get_user_model()
 
 
 class CardAPITestCase(APITestCase):
     def setUp(self):
+        seed_fundraiser_iin_fixtures()
         self.author = User.objects.create_user(
             email="author@example.com",
             password="securepass123",
             full_name="Автор Тест",
             role="author",
+            iin=AUTHOR_IIN,
         )
         self.other_author = User.objects.create_user(
             email="other@example.com",
             password="securepass123",
             full_name="Другой Автор",
             role="author",
+            iin=OTHER_AUTHOR_IIN,
         )
         self.donor = User.objects.create_user(
             email="donor@example.com",
             password="securepass123",
             full_name="Донор Тест",
             role="donor",
+            iin="870308301456",
         )
         self.moderator = User.objects.create_user(
             email="mod@example.com",
             password="securepass123",
             full_name="Модератор Тест",
             role="moderator",
+            iin="890711401678",
         )
         self.card_payload = {
+            "recipient_iin": RECIPIENT_IIN,
             "full_name": "Айгуль Смагулова",
             "diagnosis": "Онкология",
             "city": "Алматы",
@@ -49,17 +64,17 @@ class CardAPITestCase(APITestCase):
             "description": "Нужна помощь на лечение",
             "target_amount": "500000.00",
             "end_date": (date.today() + timedelta(days=90)).isoformat(),
-            "iin": "990101300123",
             "document_number": "12345678",
             "contact_phone": "+7 777 123 45 67",
             "contact_email": "family@example.com",
             "personal_data_consent": True,
         }
 
-    def _create_card(self, author=None, card_status=None):
+    def _create_card(self, author=None, card_status=None, recipient_iin=None):
         author = author or self.author
+        payload = {**self.card_payload, "recipient_iin": recipient_iin or RECIPIENT_IIN}
         self.client.force_authenticate(user=author)
-        response = self.client.post("/api/cards/", self.card_payload, format="json")
+        response = self.client.post("/api/cards/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.client.force_authenticate(user=None)
         card = FundraisingCard.objects.get(pk=response.data["id"])
@@ -71,9 +86,7 @@ class CardAPITestCase(APITestCase):
     def test_create_card_text_only(self):
         self.client.force_authenticate(user=self.author)
         payload = {
-            "full_name": "Тест Получатель",
-            "diagnosis": "ДЦП",
-            "city": "Астана",
+            "recipient_iin": RECIPIENT_IIN,
             "target_amount": "100000.00",
             "end_date": (date.today() + timedelta(days=30)).isoformat(),
             "personal_data_consent": "true",
@@ -91,9 +104,7 @@ class CardAPITestCase(APITestCase):
             content_type="image/jpeg",
         )
         payload = {
-            "full_name": "Тест С Фото",
-            "diagnosis": "Онкология",
-            "city": "Алматы",
+            "recipient_iin": RECIPIENT_IIN,
             "target_amount": "200000.00",
             "end_date": (date.today() + timedelta(days=60)).isoformat(),
             "personal_data_consent": "true",
@@ -111,11 +122,13 @@ class CardAPITestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["status"], CardStatus.DRAFT)
-        self.assertEqual(response.data["iin"], "990101300123")
+        self.assertEqual(response.data["iin"], RECIPIENT_IIN)
 
         card = FundraisingCard.objects.get(pk=response.data["id"])
         self.assertEqual(card.author, self.author)
-        self.assertEqual(card.iin_masked, mask_iin("990101300123"))
+        self.assertEqual(card.iin_masked, mask_iin(RECIPIENT_IIN))
+        self.assertEqual(card.recipient_iin, RECIPIENT_IIN)
+        self.assertFalse(card.is_self)
 
     def test_create_card_all_fields(self):
         self.client.force_authenticate(user=self.author)
@@ -125,16 +138,16 @@ class CardAPITestCase(APITestCase):
         self.assertEqual(response.data["status"], CardStatus.DRAFT)
 
         card = FundraisingCard.objects.get(pk=response.data["id"])
-        self.assertEqual(card.full_name, self.card_payload["full_name"])
-        self.assertEqual(card.diagnosis, self.card_payload["diagnosis"])
-        self.assertEqual(card.city, self.card_payload["city"])
-        self.assertEqual(card.clinic, self.card_payload["clinic"])
-        self.assertEqual(card.age, self.card_payload["age"])
-        self.assertEqual(card.gender, self.card_payload["gender"])
+        self.assertEqual(card.full_name, "Айгуль Смагулова")
+        self.assertEqual(card.diagnosis, "Онкология")
+        self.assertEqual(card.city, "Алматы")
+        self.assertEqual(card.clinic, "Городская поликлиника №5")
+        self.assertEqual(card.gender, "female")
+        self.assertGreater(card.age, 0)
         self.assertEqual(card.description, self.card_payload["description"])
         self.assertEqual(str(card.target_amount), self.card_payload["target_amount"])
         self.assertEqual(card.end_date.isoformat(), self.card_payload["end_date"])
-        self.assertEqual(card.iin_encrypted, self.card_payload["iin"])
+        self.assertEqual(card.iin_encrypted, RECIPIENT_IIN)
         self.assertEqual(card.document_number_encrypted, self.card_payload["document_number"])
         self.assertEqual(card.contact_phone, self.card_payload["contact_phone"])
         self.assertEqual(card.contact_email, self.card_payload["contact_email"])
@@ -156,7 +169,7 @@ class CardAPITestCase(APITestCase):
 
     def test_list_shows_public_cards_only_for_anonymous(self):
         public_card = self._create_card(card_status=CardStatus.ACTIVE)
-        self._create_card()
+        self._create_card(recipient_iin=ALT_RECIPIENT_IIN)
 
         response = self.client.get("/api/cards/")
 
@@ -182,7 +195,7 @@ class CardAPITestCase(APITestCase):
 
     def test_public_detail_masks_confidential_data(self):
         card = self._create_card(card_status=CardStatus.ACTIVE)
-        card.iin_encrypted = "990101300123"
+        card.iin_encrypted = RECIPIENT_IIN
         card.document_number_encrypted = "12345678"
         card.contact_phone = "+7 777 123 45 67"
         card.save()
@@ -190,7 +203,7 @@ class CardAPITestCase(APITestCase):
         response = self.client.get(f"/api/cards/{card.id}/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["iin_masked"], mask_iin("990101300123"))
+        self.assertEqual(response.data["iin_masked"], mask_iin(RECIPIENT_IIN))
         self.assertEqual(response.data["contact_phone"], mask_phone("+7 777 123 45 67"))
         self.assertNotIn("iin", response.data)
 
@@ -200,7 +213,7 @@ class CardAPITestCase(APITestCase):
         response = self.client.get(f"/api/cards/{card.id}/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["iin"], "990101300123")
+        self.assertEqual(response.data["iin"], RECIPIENT_IIN)
         self.assertEqual(response.data["contact_phone"], "+7 777 123 45 67")
 
     def test_moderator_sees_full_confidential_data(self):
@@ -209,7 +222,7 @@ class CardAPITestCase(APITestCase):
         response = self.client.get(f"/api/cards/{card.id}/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["iin"], "990101300123")
+        self.assertEqual(response.data["iin"], RECIPIENT_IIN)
 
     def test_update_own_card(self):
         card = self._create_card()
@@ -282,10 +295,10 @@ class CardAPITestCase(APITestCase):
 
     def test_my_cards_returns_all_statuses(self):
         draft = self._create_card()
-        pending = self._create_card()
+        pending = self._create_card(recipient_iin=ALT_RECIPIENT_IIN)
         pending.status = CardStatus.PENDING_MODERATION
         pending.save(update_fields=["status"])
-        active = self._create_card()
+        active = self._create_card(recipient_iin=THIRD_RECIPIENT_IIN)
         active.status = CardStatus.ACTIVE
         active.save(update_fields=["status"])
 
@@ -306,3 +319,67 @@ class CardAPITestCase(APITestCase):
         response = self.client.get("/api/cards/my/")
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_card_rejects_high_risk_author(self):
+        self.author.iin = HIGH_RISK_IIN
+        self.author.save(update_fields=["iin"])
+        self.client.force_authenticate(user=self.author)
+        response = self.client.post("/api/cards/", self.card_payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("author_iin", response.data)
+
+    def test_create_card_rejects_high_risk_recipient(self):
+        payload = {**self.card_payload, "recipient_iin": HIGH_RISK_IIN}
+        self.client.force_authenticate(user=self.author)
+        response = self.client.post("/api/cards/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("recipient_iin", response.data)
+
+    def test_create_card_rejects_unknown_recipient(self):
+        payload = {**self.card_payload, "recipient_iin": "111111111111"}
+        self.client.force_authenticate(user=self.author)
+        response = self.client.post("/api/cards/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("recipient_iin", response.data)
+
+    def test_create_card_rejects_duplicate_active_fundraiser(self):
+        self._create_card()
+        self.client.force_authenticate(user=self.author)
+        response = self.client.post("/api/cards/", self.card_payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("recipient_iin", response.data)
+
+    def test_create_card_sets_is_self_when_author_is_recipient(self):
+        from apps.medregistry.models import Gender, MedicalDiagnosis, MedicalRecord
+
+        MedicalRecord.objects.get_or_create(
+            iin=AUTHOR_IIN,
+            defaults={
+                "full_name": "Автор Тест",
+                "birth_date": date(1990, 1, 1),
+                "gender": Gender.MALE,
+                "city": "Астана",
+                "clinic": "Поликлиника №1",
+            },
+        )
+        record = MedicalRecord.objects.get(iin=AUTHOR_IIN)
+        if not record.diagnoses.exists():
+            MedicalDiagnosis.objects.create(
+                record=record,
+                name="ДЦП",
+                stage="I",
+                diagnosed_date=date(2020, 1, 1),
+            )
+
+        payload = {**self.card_payload, "recipient_iin": AUTHOR_IIN}
+        self.client.force_authenticate(user=self.author)
+        response = self.client.post("/api/cards/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        card = FundraisingCard.objects.get(pk=response.data["id"])
+        self.assertTrue(card.is_self)
+        self.assertEqual(card.diagnosis, "ДЦП")

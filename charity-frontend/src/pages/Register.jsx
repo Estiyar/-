@@ -6,6 +6,7 @@ const initialForm = {
   full_name: '',
   email: '',
   phone: '',
+  iin: '',
   password: '',
   repeat_password: '',
   role: 'donor',
@@ -37,12 +38,17 @@ export default function Register() {
       setError('Необходимо согласие на обработку персональных данных.')
       return
     }
+    if (!/^\d{12}$/.test(form.iin)) {
+      setError('ИИН должен содержать ровно 12 цифр.')
+      return
+    }
     setLoading(true)
     try {
       await register({
         full_name: form.full_name,
         email: form.email,
         phone: form.phone,
+        iin: form.iin,
         password: form.password,
         repeat_password: form.repeat_password,
         role: form.role,
@@ -85,6 +91,16 @@ export default function Register() {
           placeholder="Телефон"
           value={form.phone}
           onChange={(e) => updateField('phone', e.target.value)}
+          className="w-full rounded-2xl border border-sky-100 px-4 py-3 text-sm outline-none focus:border-teal-500"
+        />
+        <input
+          type="text"
+          placeholder="ИИН (12 цифр)"
+          value={form.iin}
+          onChange={(e) => updateField('iin', e.target.value.replace(/\D/g, '').slice(0, 12))}
+          required
+          pattern="\d{12}"
+          maxLength={12}
           className="w-full rounded-2xl border border-sky-100 px-4 py-3 text-sm outline-none focus:border-teal-500"
         />
         <select

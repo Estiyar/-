@@ -1,9 +1,10 @@
 from rest_framework import serializers
 
 from apps.common.card_status import CardStatus
-from apps.common.validators import validate_upload
+from apps.common.validators import validate_iin, validate_upload
 
 from .models import FundraisingCard, Gender
+from .services import FundraiserCreationError, prepare_fundraiser_data
 
 
 class CardPublicSerializer(serializers.ModelSerializer):
@@ -79,6 +80,8 @@ class CardPrivateSerializer(serializers.ModelSerializer):
             "collected_amount",
             "end_date",
             "status",
+            "recipient_iin",
+            "is_self",
             "iin",
             "document_number",
             "contact_phone",
@@ -114,8 +117,12 @@ class OptionalIntegerField(serializers.IntegerField):
 
 
 class CardWriteSerializer(serializers.ModelSerializer):
+    recipient_iin = serializers.CharField(required=False, allow_blank=True)
     iin = serializers.CharField(required=False, allow_blank=True)
     document_number = serializers.CharField(required=False, allow_blank=True)
+    full_name = serializers.CharField(required=False, allow_blank=True)
+    diagnosis = serializers.CharField(required=False, allow_blank=True)
+    city = serializers.CharField(required=False, allow_blank=True)
     clinic = serializers.CharField(required=False, allow_blank=True)
     age = OptionalIntegerField(required=False, allow_null=True)
     gender = serializers.ChoiceField(choices=Gender.choices, required=False, allow_blank=True)
@@ -127,6 +134,7 @@ class CardWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = FundraisingCard
         fields = (
+            "recipient_iin",
             "full_name",
             "diagnosis",
             "city",
@@ -169,21 +177,37 @@ class CardWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Редактировать можно только черновик или карточку на доработке."
             )
+        if self.instance is None:
+            recipient_iin = attrs.get("recipient_iin") or attrs.get("iin")
+            if not recipient_iin:
+                raise serializers.ValidationError(
+                    {"recipient_iin": "ИИН получателя обязателен."}
+                )
+            validate_iin(recipient_iin)
+            attrs["recipient_iin"] = recipient_iin
         return attrs
 
     def _apply_confidential_fields(self, validated_data):
-        iin = validated_data.pop("iin", None)
         document_number = validated_data.pop("document_number", None)
         validated_data.pop("personal_data_consent", None)
-        if iin is not None:
-            validated_data["iin_encrypted"] = iin
+        validated_data.pop("recipient_iin", None)
+        validated_data.pop("iin", None)
         if document_number is not None:
             validated_data["document_number_encrypted"] = document_number
         return validated_data
 
     def create(self, validated_data):
-        validated_data = self._apply_confidential_fields(validated_data)
-        validated_data["author"] = self.context["request"].user
+        author = self.context["request"].user
+        document_number = validated_data.pop("document_number", None)
+        validated_data.pop("personal_data_consent", None)
+        validated_data.pop("iin", None)
+        try:
+            validated_data = prepare_fundraiser_data(author, validated_data)
+        except FundraiserCreationError as exc:
+            raise serializers.ValidationError(exc.errors) from exc
+        if document_number is not None:
+            validated_data["document_number_encrypted"] = document_number
+        validated_data["author"] = author
         return FundraisingCard.objects.create(**validated_data)
 
     def update(self, instance, validated_data):

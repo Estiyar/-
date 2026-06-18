@@ -69,6 +69,7 @@ class Command(BaseCommand):
             full_name="Админ Тестов",
             role=Role.ADMIN,
             is_staff=True,
+            iin="870308301456",
         )
         moderators = [
             User.objects.create_user(
@@ -76,6 +77,7 @@ class Command(BaseCommand):
                 password=PASSWORD,
                 full_name=f"Модератор {i}",
                 role=Role.MODERATOR,
+                iin=f"89071140167{i}",
             )
             for i in range(1, 3)
         ]
@@ -85,6 +87,7 @@ class Command(BaseCommand):
                 password=PASSWORD,
                 full_name=f"Автор {i}",
                 role=Role.AUTHOR,
+                iin=f"85031530123{i}",
             )
             for i in range(1, 4)
         ]
@@ -94,6 +97,7 @@ class Command(BaseCommand):
                 password=PASSWORD,
                 full_name=f"Донор {i}",
                 role=Role.DONOR,
+                iin=f"93061540234{i}",
             )
             for i in range(1, 5)
         ]
@@ -140,6 +144,7 @@ class Command(BaseCommand):
                 end_date=base + timedelta(days=index * 5),
                 status=status,
                 iin_encrypted=f"99010130012{index}",
+                recipient_iin=f"99010130012{index}",
                 document_number_encrypted=f"1234567{index}",
                 contact_phone="+7 777 123 45 67",
                 contact_email=f"card{index}@example.com",

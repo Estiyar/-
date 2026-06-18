@@ -2,6 +2,8 @@ from django.contrib.auth.hashers import check_password
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
+from apps.antifraud.models import FraudProfile, RiskLevel
+
 from .models import Role, User, UserStatus
 from .permissions import IsAdmin, IsAuthor, IsDonor, IsModerator
 
@@ -14,6 +16,7 @@ class RegisterAPITestCase(APITestCase):
             "full_name": "Иван Иванов",
             "email": "ivan@example.com",
             "phone": "+7 777 123 45 67",
+            "iin": "880420301999",
             "password": "securepass123",
             "repeat_password": "securepass123",
             "role": Role.DONOR,
@@ -35,12 +38,22 @@ class RegisterAPITestCase(APITestCase):
     def test_register_author_success(self):
         response = self.client.post(
             self.url,
-            self._payload(email="author@example.com", role=Role.AUTHOR),
+            self._payload(email="author@example.com", role=Role.AUTHOR, iin="930615402345"),
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["role"], Role.AUTHOR)
+
+    def test_register_password_mismatch_rejected(self):
+        response = self.client.post(
+            self.url,
+            self._payload(repeat_password="differentpass"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("repeat_password", response.data)
 
     def test_register_moderator_role_rejected(self):
         response = self.client.post(
@@ -62,15 +75,79 @@ class RegisterAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("role", response.data)
 
-    def test_register_password_mismatch_rejected(self):
+    def test_register_invalid_iin_rejected(self):
         response = self.client.post(
             self.url,
-            self._payload(repeat_password="differentpass"),
+            self._payload(iin="123"),
             format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("repeat_password", response.data)
+        self.assertIn("iin", response.data)
+
+    def test_register_duplicate_iin_rejected(self):
+        self.client.post(self.url, self._payload(), format="json")
+        response = self.client.post(
+            self.url,
+            self._payload(email="other@example.com"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("iin", response.data)
+
+    def test_register_succeeds_with_invalid_token_header(self):
+        response = self.client.post(
+            self.url,
+            self._payload(email="newuser@example.com", iin="870308301456"),
+            format="json",
+            HTTP_AUTHORIZATION="Bearer invalid-token",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["email"], "newuser@example.com")
+
+    def test_register_author_high_risk_iin_rejected(self):
+        FraudProfile.objects.create(
+            iin="990101300999",
+            full_name="Ерболат Мукашев",
+            risk_score=92,
+            risk_level=RiskLevel.HIGH,
+            reasons=["Множественные мошеннические заявки"],
+        )
+        response = self.client.post(
+            self.url,
+            self._payload(
+                email="fraud@example.com",
+                role=Role.AUTHOR,
+                iin="990101300999",
+            ),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("iin", response.data)
+        self.assertEqual(
+            response.data["iin"][0],
+            "Регистрация невозможна: высокий уровень риска.",
+        )
+
+    def test_register_donor_high_risk_iin_allowed(self):
+        FraudProfile.objects.create(
+            iin="990101300999",
+            full_name="Ерболат Мукашев",
+            risk_score=92,
+            risk_level=RiskLevel.HIGH,
+            reasons=["Множественные мошеннические заявки"],
+        )
+        response = self.client.post(
+            self.url,
+            self._payload(email="donor-fraud@example.com", iin="990101300999"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["role"], Role.DONOR)
 
 
 class LoginLogoutMeAPITestCase(APITestCase):
@@ -81,6 +158,7 @@ class LoginLogoutMeAPITestCase(APITestCase):
             full_name="Тест Пользователь",
             phone="+7 700 000 00 00",
             role=Role.DONOR,
+            iin="930615402345",
         )
 
     def test_login_returns_jwt_tokens(self):

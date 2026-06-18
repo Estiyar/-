@@ -67,6 +67,9 @@ class FundraisingCard(models.Model):
 
     moderator_comment = models.TextField(blank=True)
 
+    recipient_iin = models.CharField(max_length=12, blank=True)
+    is_self = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

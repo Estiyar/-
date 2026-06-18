@@ -6,6 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.cards.models import FundraisingCard
+from apps.cards.test_fixtures import AUTHOR_IIN, RECIPIENT_IIN, seed_fundraiser_iin_fixtures
 from apps.common.card_status import CardStatus
 from apps.donations.serializers import DONATION_SUCCESS_MESSAGE
 from apps.expenses.models import ExpenseStatus
@@ -15,6 +16,7 @@ from apps.users.models import Role
 User = get_user_model()
 
 CARD_PAYLOAD = {
+    "recipient_iin": RECIPIENT_IIN,
     "full_name": "Айгуль Смагулова",
     "diagnosis": "Онкология",
     "city": "Алматы",
@@ -24,7 +26,6 @@ CARD_PAYLOAD = {
     "description": "Нужна помощь на лечение",
     "target_amount": "500000.00",
     "end_date": (date.today() + timedelta(days=90)).isoformat(),
-    "iin": "990101300123",
     "document_number": "12345678",
     "contact_phone": "+7 777 123 45 67",
     "contact_email": "family@example.com",
@@ -151,12 +152,14 @@ class Section30ScenarioAPITestCase(APITestCase):
         return response
 
     def test_scenario_1_create(self):
+        seed_fundraiser_iin_fixtures()
         register_response = self.client.post(
             "/api/auth/register",
             {
                 "full_name": "Сценарий Автор",
                 "email": "scenario1@example.com",
                 "phone": "+7 777 000 00 01",
+                "iin": AUTHOR_IIN,
                 "password": "securepass123",
                 "repeat_password": "securepass123",
                 "role": Role.AUTHOR,
@@ -203,7 +206,8 @@ class Section30ScenarioAPITestCase(APITestCase):
             description=CARD_PAYLOAD["description"],
             target_amount=Decimal(CARD_PAYLOAD["target_amount"]),
             end_date=date.fromisoformat(CARD_PAYLOAD["end_date"]),
-            iin_encrypted=CARD_PAYLOAD["iin"],
+            iin_encrypted=RECIPIENT_IIN,
+            recipient_iin=RECIPIENT_IIN,
             document_number_encrypted=CARD_PAYLOAD["document_number"],
             contact_phone=CARD_PAYLOAD["contact_phone"],
             contact_email=CARD_PAYLOAD["contact_email"],
@@ -218,7 +222,7 @@ class Section30ScenarioAPITestCase(APITestCase):
 
         detail_response = self.client.get(f"/api/moderation/cards/{card.id}/")
         self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(detail_response.data["iin"], CARD_PAYLOAD["iin"])
+        self.assertEqual(detail_response.data["iin"], RECIPIENT_IIN)
 
         approve_response = self.client.post(
             f"/api/moderation/cards/{card.id}/approve/",

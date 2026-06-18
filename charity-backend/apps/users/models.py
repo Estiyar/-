@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 
+from apps.common.validators import validate_iin
+
 
 class Role(models.TextChoices):
     DONOR = "donor", "Донор"
@@ -35,6 +37,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     full_name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=32, blank=True)
+    iin = models.CharField(max_length=12, unique=True, null=True, blank=True)
     role = models.CharField(max_length=16, choices=Role.choices, default=Role.DONOR)
     status = models.CharField(max_length=16, choices=UserStatus.choices, default=UserStatus.ACTIVE)
 
@@ -51,6 +54,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.full_name} ({self.role})"
+
+    def save(self, *args, **kwargs):
+        if self.iin:
+            validate_iin(self.iin)
+        super().save(*args, **kwargs)
 
     @property
     def is_blocked(self):

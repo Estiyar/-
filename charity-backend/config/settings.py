@@ -32,6 +32,8 @@ INSTALLED_APPS = [
     "apps.donations",
     "apps.expenses",
     "apps.moderation",
+    "apps.medregistry",
+    "apps.antifraud",
 ]
 
 MIDDLEWARE = [

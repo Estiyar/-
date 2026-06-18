@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { createCard, parseApiError, submitCard, uploadDocument } from '../../api/client'
+import { createCard, fetchMedicalRecord, parseApiError, submitCard, uploadDocument } from '../../api/client'
 
 const initialForm = {
+  recipient_iin: '',
   full_name: '',
   diagnosis: '',
   city: '',
@@ -12,7 +13,6 @@ const initialForm = {
   description: '',
   target_amount: '',
   end_date: '',
-  iin: '',
   document_number: '',
   contact_phone: '',
   contact_email: '',
@@ -68,18 +68,29 @@ function appendIfPresent(formData, key, value) {
   }
 }
 
+function calculateAge(birthDate) {
+  const birth = new Date(birthDate)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const monthDiff = today.getMonth() - birth.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age -= 1
+  }
+  return String(age)
+}
+
 function buildFormData(form, photoFile) {
   const formData = new FormData()
-  formData.append('full_name', form.full_name)
-  formData.append('diagnosis', form.diagnosis)
-  formData.append('city', form.city)
+  formData.append('recipient_iin', form.recipient_iin)
+  appendIfPresent(formData, 'full_name', form.full_name)
+  appendIfPresent(formData, 'diagnosis', form.diagnosis)
+  appendIfPresent(formData, 'city', form.city)
   appendIfPresent(formData, 'clinic', form.clinic)
   appendIfPresent(formData, 'age', form.age)
   appendIfPresent(formData, 'gender', form.gender)
   appendIfPresent(formData, 'description', form.description)
   formData.append('target_amount', form.target_amount)
   formData.append('end_date', form.end_date)
-  appendIfPresent(formData, 'iin', form.iin)
   appendIfPresent(formData, 'document_number', form.document_number)
   appendIfPresent(formData, 'contact_phone', form.contact_phone)
   appendIfPresent(formData, 'contact_email', form.contact_email)
@@ -104,6 +115,8 @@ export default function CreateCard() {
   const [photoFile, setPhotoFile] = useState(null)
   const [documentFiles, setDocumentFiles] = useState([])
   const [error, setError] = useState('')
+  const [lookupMessage, setLookupMessage] = useState('')
+  const [lookupLoading, setLookupLoading] = useState(false)
   const [loading, setLoading] = useState(false)
 
   function updateField(field, value) {
@@ -118,8 +131,40 @@ export default function CreateCard() {
     return true
   }
 
+  async function handleRecipientIinLookup() {
+    setLookupMessage('')
+    setError('')
+    if (!/^\d{12}$/.test(form.recipient_iin)) {
+      setLookupMessage('Введите ИИН получателя из 12 цифр.')
+      return
+    }
+    setLookupLoading(true)
+    try {
+      const record = await fetchMedicalRecord(form.recipient_iin)
+      const diagnosis = record.diagnoses?.[0]?.name || ''
+      setForm((prev) => ({
+        ...prev,
+        full_name: record.full_name || '',
+        city: record.city || '',
+        clinic: record.clinic || '',
+        diagnosis,
+        gender: record.gender || prev.gender,
+        age: record.birth_date ? calculateAge(record.birth_date) : prev.age,
+      }))
+      setLookupMessage('Данные получателя загружены из медреестра.')
+    } catch (err) {
+      setLookupMessage(parseApiError(err.data, 'Получатель не найден в медреестре.'))
+    } finally {
+      setLookupLoading(false)
+    }
+  }
+
   async function handleSave(submitForReview) {
     setError('')
+    if (!/^\d{12}$/.test(form.recipient_iin)) {
+      setError('ИИН получателя должен содержать ровно 12 цифр.')
+      return
+    }
     if (!validateConsent()) return
     setLoading(true)
     try {
@@ -146,6 +191,31 @@ export default function CreateCard() {
         className="space-y-5 rounded-3xl bg-white p-8 shadow-md"
       >
         <h1 className="text-2xl font-semibold text-slate-800">Создать сбор</h1>
+
+        <div className="space-y-2">
+          <FieldLabel required>ИИН получателя</FieldLabel>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={form.recipient_iin}
+              onChange={(e) => updateField('recipient_iin', e.target.value.replace(/\D/g, '').slice(0, 12))}
+              onBlur={handleRecipientIinLookup}
+              required
+              pattern="\d{12}"
+              maxLength={12}
+              className={inputClassName()}
+            />
+            <button
+              type="button"
+              onClick={handleRecipientIinLookup}
+              disabled={lookupLoading}
+              className="shrink-0 rounded-2xl border border-teal-200 px-4 py-3 text-sm font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-60"
+            >
+              {lookupLoading ? 'Проверка...' : 'Проверить'}
+            </button>
+          </div>
+          {lookupMessage && <p className="text-sm text-slate-600">{lookupMessage}</p>}
+        </div>
 
         <div className="space-y-2">
           <FieldLabel required>ФИО получателя</FieldLabel>
@@ -244,16 +314,6 @@ export default function CreateCard() {
             value={form.end_date}
             onChange={(e) => updateField('end_date', e.target.value)}
             required
-            className={inputClassName()}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <FieldLabel>ИИН</FieldLabel>
-          <input
-            type="text"
-            value={form.iin}
-            onChange={(e) => updateField('iin', e.target.value)}
             className={inputClassName()}
           />
         </div>

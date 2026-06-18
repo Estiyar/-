@@ -2,6 +2,9 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
+from apps.antifraud.services import is_high_risk
+from apps.common.validators import validate_iin
+
 from .models import Role, User
 
 
@@ -13,6 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
             "full_name",
             "email",
             "phone",
+            "iin",
             "role",
             "status",
             "created_at",
@@ -30,10 +34,15 @@ class RegisterSerializer(serializers.ModelSerializer):
             "full_name",
             "email",
             "phone",
+            "iin",
             "password",
             "repeat_password",
             "role",
         )
+
+    def validate_iin(self, value):
+        validate_iin(value)
+        return value
 
     def validate_role(self, value):
         if value not in (Role.DONOR, Role.AUTHOR):
@@ -48,6 +57,10 @@ class RegisterSerializer(serializers.ModelSerializer):
                 {"repeat_password": "Пароли не совпадают."}
             )
         validate_password(attrs["password"])
+        if attrs["role"] == Role.AUTHOR and is_high_risk(attrs["iin"]):
+            raise serializers.ValidationError(
+                {"iin": "Регистрация невозможна: высокий уровень риска."}
+            )
         return attrs
 
     def create(self, validated_data):

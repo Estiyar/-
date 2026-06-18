@@ -23,7 +23,7 @@ export function parseApiError(data, fallback = 'Запрос не выполне
     if (Array.isArray(value) && value[0]) return value[0]
     if (typeof value === 'string' && value) return value
   }
-  const fields = ['email', 'password', 'repeat_password', 'role', 'full_name', 'phone']
+  const fields = ['email', 'password', 'repeat_password', 'role', 'full_name', 'phone', 'iin', 'recipient_iin']
   for (const field of fields) {
     if (Array.isArray(data[field]) && data[field][0]) return data[field][0]
   }
@@ -31,13 +31,14 @@ export function parseApiError(data, fallback = 'Запрос не выполне
 }
 
 async function request(path, options = {}) {
-  const isFormData = options.body instanceof FormData
+  const { authenticated = true, ...fetchOptions } = options
+  const isFormData = fetchOptions.body instanceof FormData
   const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
+    ...fetchOptions,
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...authHeaders(),
-      ...options.headers,
+      ...(authenticated ? authHeaders() : {}),
+      ...fetchOptions.headers,
     },
   })
   const data = await response.json().catch(() => null)
@@ -54,6 +55,7 @@ export function register(payload) {
   return request('/auth/register', {
     method: 'POST',
     body: JSON.stringify(payload),
+    authenticated: false,
   })
 }
 
@@ -61,6 +63,7 @@ export function login(email, password) {
   return request('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+    authenticated: false,
   }).then((data) => {
     setToken(data.access)
     return data
@@ -73,6 +76,14 @@ export function logout() {
 
 export function fetchMe() {
   return request('/auth/me')
+}
+
+export function fetchMedicalRecord(iin) {
+  return request(`/medregistry/${iin}/`)
+}
+
+export function fetchFraudProfile(iin) {
+  return request(`/antifraud/${iin}/`)
 }
 
 export function fetchStats() {
