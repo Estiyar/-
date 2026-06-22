@@ -89,6 +89,17 @@ class RefundDecisionAPITestCase(APITestCase):
         )
         PlatformSettings.get_solo()
 
+    def _mark_deceased(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(
+            f"/api/admin/cards/{self.card.id}/set-status/",
+            {"status": CardStatus.DECEASED},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.card.refresh_from_db()
+        self.client.force_authenticate(user=None)
+
     def _complete_card(self):
         self.client.force_authenticate(user=self.admin)
         response = self.client.post(
@@ -100,8 +111,8 @@ class RefundDecisionAPITestCase(APITestCase):
         self.card.refresh_from_db()
         self.client.force_authenticate(user=None)
 
-    def test_completed_card_with_leftover_opens_refund_period(self):
-        self._complete_card()
+    def test_deceased_card_with_leftover_opens_refund_period(self):
+        self._mark_deceased()
 
         self.assertEqual(self.card.status, CardStatus.REDISTRIBUTION)
         decisions = RefundDecision.objects.filter(card=self.card)
@@ -112,8 +123,14 @@ class RefundDecisionAPITestCase(APITestCase):
         donor_decision = decisions.get(donor=self.donor)
         self.assertEqual(donor_decision.share_amount, Decimal("60000.00"))
 
-    def test_list_my_pending_refunds(self):
+    def test_completed_card_with_leftover_archives_without_refund(self):
         self._complete_card()
+
+        self.assertEqual(self.card.status, CardStatus.ARCHIVED)
+        self.assertEqual(RefundDecision.objects.filter(card=self.card).count(), 0)
+
+    def test_list_my_pending_refunds(self):
+        self._mark_deceased()
         self.client.force_authenticate(user=self.donor)
         response = self.client.get("/api/refunds/my/")
 
@@ -125,7 +142,7 @@ class RefundDecisionAPITestCase(APITestCase):
         self.assertTrue(len(response.data[0]["redirect_options"]) >= 1)
 
     def test_list_my_refund_history_after_choice(self):
-        self._complete_card()
+        self._mark_deceased()
         decision = RefundDecision.objects.get(donor=self.donor)
         self.client.force_authenticate(user=self.donor)
         choose_response = self.client.post(
@@ -146,14 +163,14 @@ class RefundDecisionAPITestCase(APITestCase):
         self.assertIsNotNone(history_response.data[0]["resolved_at"])
 
     def test_refund_history_excludes_other_donors(self):
-        self._complete_card()
+        self._mark_deceased()
         self.client.force_authenticate(user=self.other_donor)
         response = self.client.get("/api/refunds/history/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 0)
 
     def test_choose_keep(self):
-        self._complete_card()
+        self._mark_deceased()
         decision = RefundDecision.objects.get(donor=self.donor)
         self.client.force_authenticate(user=self.donor)
         response = self.client.post(
@@ -170,7 +187,7 @@ class RefundDecisionAPITestCase(APITestCase):
         self.assertEqual(self.card.collected_amount, Decimal("110000.00"))
 
     def test_choose_refund_reduces_collected_amount(self):
-        self._complete_card()
+        self._mark_deceased()
         decision = RefundDecision.objects.get(donor=self.donor)
         self.client.force_authenticate(user=self.donor)
         response = self.client.post(
@@ -198,7 +215,7 @@ class RefundDecisionAPITestCase(APITestCase):
         )
 
     def test_choose_redirect_moves_amount_to_target_card(self):
-        self._complete_card()
+        self._mark_deceased()
         decision = RefundDecision.objects.get(donor=self.donor)
         self.client.force_authenticate(user=self.donor)
         response = self.client.post(
@@ -234,7 +251,7 @@ class RefundDecisionAPITestCase(APITestCase):
             end_date=date.today() + timedelta(days=45),
             status=CardStatus.ACTIVE,
         )
-        self._complete_card()
+        self._mark_deceased()
         self.client.force_authenticate(user=self.donor)
         response = self.client.get("/api/refunds/my/")
 
@@ -246,7 +263,7 @@ class RefundDecisionAPITestCase(APITestCase):
     def test_redirect_fallback_to_all_active_when_no_same_diagnosis(self):
         self.target_card.diagnosis = "ДЦП"
         self.target_card.save(update_fields=["diagnosis"])
-        self._complete_card()
+        self._mark_deceased()
         decision = RefundDecision.objects.get(donor=self.donor)
         self.client.force_authenticate(user=self.donor)
 
@@ -267,13 +284,13 @@ class RefundDecisionAPITestCase(APITestCase):
     def test_no_refund_period_without_leftover(self):
         self.card.collected_amount = Decimal("0.00")
         self.card.save(update_fields=["collected_amount"])
-        self._complete_card()
+        self._mark_deceased()
 
-        self.assertEqual(self.card.status, CardStatus.COMPLETED)
+        self.assertEqual(self.card.status, CardStatus.ARCHIVED)
         self.assertEqual(RefundDecision.objects.filter(card=self.card).count(), 0)
 
     def test_maybe_open_refund_period_is_idempotent(self):
-        self.card.status = CardStatus.COMPLETED
+        self.card.status = CardStatus.DECEASED
         self.card.save(update_fields=["status"])
         maybe_open_refund_period(self.card)
         count_after_first = RefundDecision.objects.filter(card=self.card).count()
@@ -281,7 +298,7 @@ class RefundDecisionAPITestCase(APITestCase):
         self.assertEqual(RefundDecision.objects.filter(card=self.card).count(), count_after_first)
 
     def test_process_refund_deadlines_expires_and_applies_keep(self):
-        self._complete_card()
+        self._mark_deceased()
         RefundDecision.objects.filter(card=self.card).update(
             deadline=timezone.now() - timedelta(hours=1)
         )
@@ -303,7 +320,7 @@ class RefundDecisionAPITestCase(APITestCase):
         self.assertEqual(self.card.collected_amount, Decimal("110000.00"))
 
     def test_card_archived_when_all_decisions_done(self):
-        self._complete_card()
+        self._mark_deceased()
         decisions = RefundDecision.objects.filter(card=self.card)
         for decision in decisions:
             decision.deadline = timezone.now() + timedelta(days=1)
@@ -331,7 +348,7 @@ class RefundDecisionAPITestCase(APITestCase):
         self.assertEqual(self.card.status, CardStatus.ARCHIVED)
 
     def test_management_command_process_refund_deadlines(self):
-        self._complete_card()
+        self._mark_deceased()
         RefundDecision.objects.filter(card=self.card).update(
             deadline=timezone.now() - timedelta(minutes=5)
         )

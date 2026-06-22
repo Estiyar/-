@@ -20,10 +20,7 @@ class RefundDecisionError(Exception):
         super().__init__(message)
 
 
-REFUND_TRIGGER_STATUSES = {
-    CardStatus.COMPLETED,
-    CardStatus.DECEASED,
-}
+REFUND_TRIGGER_STATUSES = {CardStatus.DECEASED}
 
 OWN_FUNDRAISER_DONATION_MESSAGE = "Нельзя жертвовать в собственный сбор."
 
@@ -40,6 +37,25 @@ def is_own_fundraiser(user, card):
 
 def calculate_leftover(card):
     return Decimal(str(card.collected_amount)) - Decimal(str(card.escrow_spent))
+
+
+def archive_card_without_refund(card):
+    card = FundraisingCard.objects.get(pk=card.pk)
+    if card.status in {CardStatus.COMPLETED, CardStatus.DECEASED}:
+        transition(card, CardStatus.ARCHIVED)
+    return card
+
+
+@transaction.atomic
+def maybe_auto_complete_on_goal(card):
+    card = FundraisingCard.objects.select_for_update().get(pk=card.pk)
+    if card.status != CardStatus.ACTIVE:
+        return card
+    if Decimal(str(card.collected_amount)) < Decimal(str(card.target_amount)):
+        return card
+    transition(card, CardStatus.COMPLETED)
+    archive_card_without_refund(card)
+    return card
 
 
 def allocate_donation_shares(donations, leftover, collected_amount):
@@ -149,8 +165,14 @@ def maybe_open_refund_period(card):
 
 
 def handle_card_status_change(card, new_status):
-    if new_status in REFUND_TRIGGER_STATUSES:
+    if new_status == CardStatus.COMPLETED:
+        archive_card_without_refund(card)
+        return
+    if new_status == CardStatus.DECEASED:
         maybe_open_refund_period(card)
+        card.refresh_from_db()
+        if card.status == CardStatus.DECEASED:
+            archive_card_without_refund(card)
 
 
 @transaction.atomic

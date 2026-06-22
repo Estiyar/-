@@ -19,7 +19,7 @@ from .serializers import (
     RefundDecisionChooseSerializer,
     RefundDecisionSerializer,
 )
-from .services import RefundDecisionError, apply_refund_choice
+from .services import RefundDecisionError, apply_refund_choice, maybe_auto_complete_on_goal
 
 
 class PublicCardMixin:
@@ -49,6 +49,8 @@ class DonateView(APIView):
         FundraisingCard.objects.filter(pk=card.pk).update(
             collected_amount=F("collected_amount") + donation.amount
         )
+        card.refresh_from_db()
+        maybe_auto_complete_on_goal(card)
         card.refresh_from_db()
         return Response(
             {

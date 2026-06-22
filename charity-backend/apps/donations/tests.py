@@ -95,6 +95,42 @@ class DonationAPITestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_donate_archived_card_rejected(self):
+        self.active_card.status = CardStatus.ARCHIVED
+        self.active_card.save(update_fields=["status"])
+
+        response = self.client.post(
+            f"/api/cards/{self.active_card.id}/donate/",
+            self.donate_payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_donate_auto_completes_when_goal_reached(self):
+        self.active_card.collected_amount = Decimal("495000.00")
+        self.active_card.save(update_fields=["collected_amount"])
+        payload = {**self.donate_payload, "amount": "5000.00"}
+
+        response = self.client.post(
+            f"/api/cards/{self.active_card.id}/donate/",
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["collected_amount"], "500000.00")
+        self.active_card.refresh_from_db()
+        self.assertEqual(self.active_card.collected_amount, Decimal("500000.00"))
+        self.assertEqual(self.active_card.status, CardStatus.ARCHIVED)
+
+        second_response = self.client.post(
+            f"/api/cards/{self.active_card.id}/donate/",
+            self.donate_payload,
+            format="json",
+        )
+        self.assertEqual(second_response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_list_donations_for_public_card(self):
         Donation.objects.create(
             card=self.active_card,
