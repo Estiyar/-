@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { chooseRefundDecision } from '../api/client'
 import { formatDateTime, formatMoney } from '../utils/format'
 
@@ -126,7 +125,7 @@ export default function RefundDecisionForm({ decision, onResolved }) {
 
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-4">
         <button
           type="submit"
           disabled={loading || !canSubmitRedirect}
@@ -134,12 +133,6 @@ export default function RefundDecisionForm({ decision, onResolved }) {
         >
           {loading ? 'Сохранение...' : 'Подтвердить решение'}
         </button>
-        <Link
-          to={`/cards/${decision.card.id}`}
-          className="text-sm font-medium text-teal-600 hover:underline"
-        >
-          Открыть сбор
-        </Link>
       </div>
     </form>
   )

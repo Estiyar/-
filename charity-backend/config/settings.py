@@ -76,6 +76,7 @@ def _postgres_database(name_env, name_default, prefix):
         "PASSWORD": pick("PASSWORD", "DB_PASSWORD", "postgres"),
         "HOST": pick("HOST", "DB_HOST", "localhost"),
         "PORT": pick("PORT", "DB_PORT", "5432"),
+        "OPTIONS": {"sslmode": "require"},
     }
 
 
