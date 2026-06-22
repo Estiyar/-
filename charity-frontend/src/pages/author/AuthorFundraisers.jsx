@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchExpenses, fetchMyCards, submitCard } from '../../api/client'
-import EscrowBlock from '../../components/EscrowBlock'
-import ExpenseForm from '../../components/ExpenseForm'
-import ExpenseHistory from '../../components/ExpenseHistory'
+import { fetchMyCards, submitCard } from '../../api/client'
 import { formatDate, formatMoney, statusBadgeClass, statusLabel } from '../../utils/format'
 
-const EXPENSE_CARD_STATUSES = new Set(['active', 'completed'])
 const REVISION_STATUSES = new Set(['revision_required'])
 const REJECTED_STATUSES = new Set(['rejected'])
 
@@ -47,7 +43,7 @@ function CardArticle({ card, onSubmit }) {
             </button>
           )}
           <Link
-            to={`/cards/${card.id}`}
+            to={`/author/cards/${card.id}`}
             className="rounded-2xl bg-teal-500 px-4 py-2 text-sm font-semibold text-white"
           >
             Открыть
@@ -66,34 +62,20 @@ function CardArticle({ card, onSubmit }) {
 
 export default function AuthorFundraisers() {
   const [cards, setCards] = useState([])
-  const [expensesByCard, setExpensesByCard] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
-  const loadExpenses = useCallback((cardId) => {
-    fetchExpenses(cardId)
-      .then((items) => setExpensesByCard((prev) => ({ ...prev, [cardId]: items })))
-      .catch(() => setExpensesByCard((prev) => ({ ...prev, [cardId]: [] })))
-  }, [])
 
   const loadCards = useCallback(() => {
     setLoading(true)
     setError('')
     fetchMyCards()
-      .then((items) => {
-        setCards(items)
-        items.forEach((card) => {
-          if (EXPENSE_CARD_STATUSES.has(card.status)) {
-            loadExpenses(card.id)
-          }
-        })
-      })
+      .then(setCards)
       .catch(() => {
         setCards([])
         setError('Не удалось загрузить карточки.')
       })
       .finally(() => setLoading(false))
-  }, [loadExpenses])
+  }, [])
 
   useEffect(() => {
     loadCards()
@@ -104,7 +86,6 @@ export default function AuthorFundraisers() {
   const myCards = cards.filter(
     (card) => card.status !== 'pending_moderation' && card.status !== 'revision_required',
   )
-  const expenseCards = cards.filter((card) => EXPENSE_CARD_STATUSES.has(card.status))
 
   async function handleSubmit(cardId) {
     try {
@@ -113,11 +94,6 @@ export default function AuthorFundraisers() {
     } catch {
       setError('Не удалось отправить карточку на модерацию.')
     }
-  }
-
-  function refreshCard(cardId) {
-    loadExpenses(cardId)
-    loadCards()
   }
 
   if (error) {
@@ -175,21 +151,6 @@ export default function AuthorFundraisers() {
               <CardArticle key={card.id} card={card} onSubmit={handleSubmit} />
             ))}
           </div>
-        </section>
-      )}
-
-      {expenseCards.length > 0 && (
-        <section className="space-y-6">
-          <SectionTitle>История расходов</SectionTitle>
-          {expenseCards.map((card) => (
-            <div key={`exp-${card.id}`} className="space-y-4">
-              <EscrowBlock card={card} />
-              <div className="grid gap-6 lg:grid-cols-2">
-                <ExpenseForm cardId={card.id} onSuccess={() => refreshCard(card.id)} />
-                <ExpenseHistory expenses={expensesByCard[card.id] || []} />
-              </div>
-            </div>
-          ))}
         </section>
       )}
     </div>

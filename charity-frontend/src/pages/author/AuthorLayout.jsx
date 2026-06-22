@@ -19,7 +19,7 @@ export default function AuthorLayout() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-800">Личный кабинет автора</h1>
-          <p className="text-slate-600">Мои сборы, расходы и пожертвования</p>
+          <p className="text-slate-600">Мои сборы и пожертвования</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link

@@ -54,7 +54,6 @@ def maybe_auto_complete_on_goal(card):
     if Decimal(str(card.collected_amount)) < Decimal(str(card.target_amount)):
         return card
     transition(card, CardStatus.COMPLETED)
-    archive_card_without_refund(card)
     return card
 
 
@@ -165,9 +164,6 @@ def maybe_open_refund_period(card):
 
 
 def handle_card_status_change(card, new_status):
-    if new_status == CardStatus.COMPLETED:
-        archive_card_without_refund(card)
-        return
     if new_status == CardStatus.DECEASED:
         maybe_open_refund_period(card)
         card.refresh_from_db()

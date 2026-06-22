@@ -5,7 +5,7 @@ import ApprovedExpensesTable from '../components/ApprovedExpensesTable'
 import DonationForm from '../components/DonationForm'
 import EscrowBlock from '../components/EscrowBlock'
 import ProgressBar from '../components/ProgressBar'
-import { formatDate, formatMoney, statusLabel } from '../utils/format'
+import { formatDate, formatMoney, statusBadgeClass, statusLabel } from '../utils/format'
 
 const OWN_FUNDRAISER_DONATION_MESSAGE = 'Нельзя жертвовать в собственный сбор.'
 
@@ -69,7 +69,7 @@ export default function CardDetail() {
             <div className="space-y-4 p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-3xl font-bold text-slate-800">{card.full_name}</h1>
-                <span className="rounded-full bg-mint-100 px-4 py-2 text-sm font-medium text-teal-600">
+                <span className={`rounded-full px-4 py-2 text-sm font-medium ${statusBadgeClass(card.status)}`}>
                   {statusLabel(card.status)}
                 </span>
               </div>
@@ -140,6 +140,13 @@ export default function CardDetail() {
                 fetchDonations(id).then(setDonations).catch(() => {})
               }}
             />
+          ) : card.status === 'completed' ? (
+            <div className="rounded-3xl bg-white p-6 shadow-md">
+              <h3 className="text-xl font-semibold text-slate-800">Сделать пожертвование</h3>
+              <p className="mt-3 text-sm text-slate-600">
+                Сбор завершён. Цель достигнута, новые пожертвования не принимаются.
+              </p>
+            </div>
           ) : card.status === 'active' && card.can_donate === false ? (
             <div className="rounded-3xl bg-white p-6 shadow-md">
               <h3 className="text-xl font-semibold text-slate-800">Сделать пожертвование</h3>

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { mediaUrl } from '../api/client'
-import { formatDate, formatMoney, statusLabel } from '../utils/format'
+import { formatDate, formatMoney, statusBadgeClass, statusLabel } from '../utils/format'
 import ProgressBar from './ProgressBar'
 
 export default function CardItem({ card }) {
@@ -17,7 +17,7 @@ export default function CardItem({ card }) {
       <div className="flex flex-1 flex-col gap-3 p-5">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-lg font-semibold text-slate-800">{card.full_name}</h3>
-          <span className="rounded-full bg-mint-100 px-3 py-1 text-xs font-medium text-teal-600">
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusBadgeClass(card.status)}`}>
             {statusLabel(card.status)}
           </span>
         </div>
@@ -38,12 +38,14 @@ export default function CardItem({ card }) {
           >
             Подробнее
           </Link>
-          <Link
-            to={`/cards/${card.id}#donate`}
-            className="flex-1 rounded-2xl bg-teal-500 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-teal-600"
-          >
-            Помочь
-          </Link>
+          {card.status === 'active' && (
+            <Link
+              to={`/cards/${card.id}#donate`}
+              className="flex-1 rounded-2xl bg-teal-500 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-teal-600"
+            >
+              Помочь
+            </Link>
+          )}
         </div>
       </div>
     </article>

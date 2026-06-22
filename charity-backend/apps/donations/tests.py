@@ -122,7 +122,11 @@ class DonationAPITestCase(APITestCase):
         self.assertEqual(response.data["collected_amount"], "500000.00")
         self.active_card.refresh_from_db()
         self.assertEqual(self.active_card.collected_amount, Decimal("500000.00"))
-        self.assertEqual(self.active_card.status, CardStatus.ARCHIVED)
+        self.assertEqual(self.active_card.status, CardStatus.COMPLETED)
+
+        card_response = self.client.get(f"/api/cards/{self.active_card.id}/")
+        self.assertEqual(card_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(card_response.data["status"], CardStatus.COMPLETED)
 
         second_response = self.client.post(
             f"/api/cards/{self.active_card.id}/donate/",

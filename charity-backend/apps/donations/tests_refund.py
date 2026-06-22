@@ -123,10 +123,10 @@ class RefundDecisionAPITestCase(APITestCase):
         donor_decision = decisions.get(donor=self.donor)
         self.assertEqual(donor_decision.share_amount, Decimal("60000.00"))
 
-    def test_completed_card_with_leftover_archives_without_refund(self):
+    def test_completed_card_with_leftover_stays_completed_without_refund(self):
         self._complete_card()
 
-        self.assertEqual(self.card.status, CardStatus.ARCHIVED)
+        self.assertEqual(self.card.status, CardStatus.COMPLETED)
         self.assertEqual(RefundDecision.objects.filter(card=self.card).count(), 0)
 
     def test_list_my_pending_refunds(self):

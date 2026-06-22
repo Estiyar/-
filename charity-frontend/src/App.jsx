@@ -3,6 +3,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Footer from './components/Footer'
 import Header from './components/Header'
 import CreateCard from './pages/author/CreateCard'
+import AuthorFundraiserDetail from './pages/author/AuthorFundraiserDetail'
 import AuthorFundraisers from './pages/author/AuthorFundraisers'
 import AuthorLayout from './pages/author/AuthorLayout'
 import AuthorProfile from './pages/author/AuthorProfile'
@@ -46,6 +47,7 @@ export default function App() {
             )}
           >
             <Route index element={<AuthorFundraisers />} />
+            <Route path="cards/:id" element={<AuthorFundraiserDetail />} />
             <Route path="donor" element={<DonorCabinetPanel showProfile={false} />} />
           </Route>
           <Route

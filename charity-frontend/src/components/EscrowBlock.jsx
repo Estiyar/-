@@ -1,9 +1,13 @@
 import { formatMoney } from '../utils/format'
 
-export default function EscrowBlock({ card }) {
+export default function EscrowBlock({ card, showFundraiserName = false }) {
+  const title = showFundraiserName && card.full_name
+    ? `Эскроу-счёт — ${card.full_name}`
+    : 'Эскроу-счёт'
+
   return (
     <section className="rounded-3xl bg-white p-6 shadow-md">
-      <h2 className="text-xl font-semibold text-slate-800">Эскроу-счёт</h2>
+      <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
       <p className="mt-2 text-sm text-slate-600">
         Средства учитываются отдельно по каждой карточке.
       </p>
