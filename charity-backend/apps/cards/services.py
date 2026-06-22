@@ -1,4 +1,4 @@
-from apps.antifraud.services import is_high_risk
+from apps.antifraud.services import is_blocked, needs_review
 from apps.common.card_status import CardStatus
 from apps.medregistry.services import (
     calculate_age_from_birth_date,
@@ -31,10 +31,16 @@ def recipient_has_active_fundraiser(recipient_iin):
     ).exists()
 
 
-def check_high_risk_iin(iin, field_name):
-    if is_high_risk(iin):
+def check_blocked_iin(iin, field_name):
+    if is_blocked(iin):
         return {field_name: "Высокий уровень риска. Создание сбора невозможно."}
     return None
+
+
+def should_flag_extra_review(author_iin, recipient_iin):
+    if author_iin and needs_review(author_iin):
+        return True
+    return needs_review(recipient_iin)
 
 
 def apply_medregistry_data(validated_data, record, author_iin, recipient_iin):
@@ -59,11 +65,11 @@ def prepare_fundraiser_data(author, validated_data):
 
     errors = {}
     if author.iin:
-        author_error = check_high_risk_iin(author.iin, "author_iin")
+        author_error = check_blocked_iin(author.iin, "author_iin")
         if author_error:
             errors.update(author_error)
 
-    recipient_error = check_high_risk_iin(recipient_iin, "recipient_iin")
+    recipient_error = check_blocked_iin(recipient_iin, "recipient_iin")
     if recipient_error:
         errors.update(recipient_error)
 
@@ -77,4 +83,10 @@ def prepare_fundraiser_data(author, validated_data):
     if errors:
         raise FundraiserCreationError(errors)
 
-    return apply_medregistry_data(validated_data, record, author.iin, recipient_iin)
+    validated_data = apply_medregistry_data(
+        validated_data, record, author.iin, recipient_iin
+    )
+    validated_data["needs_extra_review"] = should_flag_extra_review(
+        author.iin, recipient_iin
+    )
+    return validated_data

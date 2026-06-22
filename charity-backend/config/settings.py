@@ -62,6 +62,9 @@ TEMPLATES = [{
 WSGI_APPLICATION = "config.wsgi.application"
 
 
+LOCAL_DB_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
 def _postgres_database(name_env, name_default, prefix):
     def pick(suffix, default_key, fallback):
         value = os.environ.get(f"{prefix}_DB_{suffix}")
@@ -69,15 +72,18 @@ def _postgres_database(name_env, name_default, prefix):
             return value
         return os.environ.get(default_key, fallback)
 
-    return {
+    host = pick("HOST", "DB_HOST", "localhost")
+    config = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get(name_env, name_default),
         "USER": pick("USER", "DB_USER", "postgres"),
         "PASSWORD": pick("PASSWORD", "DB_PASSWORD", "postgres"),
-        "HOST": pick("HOST", "DB_HOST", "localhost"),
+        "HOST": host,
         "PORT": pick("PORT", "DB_PORT", "5432"),
-        "OPTIONS": {"sslmode": "require"},
     }
+    if host not in LOCAL_DB_HOSTS:
+        config["OPTIONS"] = {"sslmode": "require"}
+    return config
 
 
 DATABASES = {

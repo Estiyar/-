@@ -152,6 +152,27 @@ class RegisterAPITestCase(APITestCase):
             "Регистрация невозможна: высокий уровень риска.",
         )
 
+    def test_register_author_medium_risk_iin_allowed(self):
+        FraudProfile.objects.create(
+            iin="960505301888",
+            full_name="Алма Тлеубергенова",
+            risk_score=55,
+            risk_level=RiskLevel.MEDIUM,
+            reasons=["Повторные обращения"],
+        )
+        response = self.client.post(
+            self.url,
+            self._payload(
+                email="medium@example.com",
+                role=Role.AUTHOR,
+                iin="960505301888",
+            ),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["role"], Role.AUTHOR)
+
     def test_register_donor_high_risk_iin_allowed(self):
         FraudProfile.objects.create(
             iin="990101300999",

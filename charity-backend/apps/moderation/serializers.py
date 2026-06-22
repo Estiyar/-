@@ -32,6 +32,7 @@ class ModerationCardListSerializer(serializers.ModelSerializer):
             "target_amount",
             "end_date",
             "documents_count",
+            "needs_extra_review",
             "created_at",
             "updated_at",
         )
@@ -43,7 +44,11 @@ class ModerationCardDetailSerializer(CardPrivateSerializer):
     moderation_logs = ModerationLogSerializer(many=True, read_only=True)
 
     class Meta(CardPrivateSerializer.Meta):
-        fields = CardPrivateSerializer.Meta.fields + ("documents", "moderation_logs")
+        fields = CardPrivateSerializer.Meta.fields + (
+            "needs_extra_review",
+            "documents",
+            "moderation_logs",
+        )
 
 
 class ModerationCommentSerializer(serializers.Serializer):

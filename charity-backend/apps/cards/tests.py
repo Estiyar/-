@@ -13,6 +13,7 @@ from .test_fixtures import (
     ALT_RECIPIENT_IIN,
     AUTHOR_IIN,
     HIGH_RISK_IIN,
+    MEDIUM_RISK_IIN,
     OTHER_AUTHOR_IIN,
     RECIPIENT_IIN,
     THIRD_RECIPIENT_IIN,
@@ -338,6 +339,15 @@ class CardAPITestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("recipient_iin", response.data)
+
+    def test_create_card_flags_medium_risk_recipient_for_extra_review(self):
+        payload = {**self.card_payload, "recipient_iin": MEDIUM_RISK_IIN}
+        self.client.force_authenticate(user=self.author)
+        response = self.client.post("/api/cards/", payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        card = FundraisingCard.objects.get(pk=response.data["id"])
+        self.assertTrue(card.needs_extra_review)
 
     def test_create_card_rejects_unknown_recipient(self):
         payload = {**self.card_payload, "recipient_iin": "111111111111"}

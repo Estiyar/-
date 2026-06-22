@@ -71,7 +71,14 @@ export default function ModeratorList({ status, title, documentsMode = false, ex
           {items.map((card) => (
             <div key={card.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sky-50 p-4">
               <div>
-                <p className="font-medium text-slate-800">{card.full_name}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-slate-800">{card.full_name}</p>
+                  {card.needs_extra_review && (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                      Усиленная проверка
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-slate-500">
                   {card.diagnosis} · {card.city} · {statusLabel(card.status)}
                 </p>

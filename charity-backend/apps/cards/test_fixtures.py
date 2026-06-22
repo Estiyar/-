@@ -9,6 +9,7 @@ RECIPIENT_IIN = "850315301234"
 ALT_RECIPIENT_IIN = "920712401567"
 THIRD_RECIPIENT_IIN = "780901300789"
 HIGH_RISK_IIN = "990101300999"
+MEDIUM_RISK_IIN = "960505301888"
 
 
 def _seed_fraud_profile(iin, full_name, risk_score, risk_level, reasons):
@@ -72,6 +73,13 @@ def seed_fundraiser_iin_fixtures():
         RiskLevel.HIGH,
         ["Множественные мошеннические заявки"],
     )
+    _seed_fraud_profile(
+        MEDIUM_RISK_IIN,
+        "Алма Тлеубергенова",
+        55,
+        RiskLevel.MEDIUM,
+        ["Повторные обращения за помощью"],
+    )
     _seed_recipient(
         RECIPIENT_IIN,
         "Айгуль Смагулова",
@@ -95,4 +103,12 @@ def seed_fundraiser_iin_fixtures():
         "Областная больница",
         Gender.FEMALE,
         "Порок сердца",
+    )
+    _seed_recipient(
+        MEDIUM_RISK_IIN,
+        "Алма Тлеубергенова",
+        "Караганда",
+        "Городская больница",
+        Gender.FEMALE,
+        "Онкология",
     )

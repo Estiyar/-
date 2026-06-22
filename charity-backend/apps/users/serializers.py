@@ -4,7 +4,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from apps.antifraud.services import is_high_risk
+from apps.antifraud.services import is_blocked
 from apps.common.validators import validate_iin
 
 from .models import BalanceTransaction, Role, User
@@ -100,7 +100,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 {"repeat_password": "Пароли не совпадают."}
             )
         validate_password(attrs["password"])
-        if attrs["role"] == Role.AUTHOR and is_high_risk(attrs["iin"]):
+        if attrs["role"] == Role.AUTHOR and is_blocked(attrs["iin"]):
             raise serializers.ValidationError(
                 {"iin": "Регистрация невозможна: высокий уровень риска."}
             )

@@ -3,8 +3,49 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import FraudProfile, RiskLevel
+from .services import is_blocked, needs_review
 
 User = get_user_model()
+
+
+class AntifraudServicesTestCase(APITestCase):
+    databases = {"default", "medregistry", "antifraud"}
+
+    def setUp(self):
+        FraudProfile.objects.create(
+            iin="850315301234",
+            full_name="Айгуль Смагулова",
+            risk_score=12,
+            risk_level=RiskLevel.LOW,
+            reasons=["Проверенный получатель помощи"],
+        )
+        FraudProfile.objects.create(
+            iin="960505301888",
+            full_name="Алма Тлеубергенова",
+            risk_score=55,
+            risk_level=RiskLevel.MEDIUM,
+            reasons=["Повторные обращения"],
+        )
+        FraudProfile.objects.create(
+            iin="990101300999",
+            full_name="Ерболат Мукашев",
+            risk_score=92,
+            risk_level=RiskLevel.HIGH,
+            reasons=["Множественные мошеннические заявки"],
+        )
+
+    def test_is_blocked_for_high_score(self):
+        self.assertTrue(is_blocked("990101300999"))
+        self.assertFalse(is_blocked("850315301234"))
+
+    def test_needs_review_for_medium_score(self):
+        self.assertTrue(needs_review("960505301888"))
+        self.assertFalse(needs_review("850315301234"))
+        self.assertFalse(needs_review("990101300999"))
+
+    def test_unknown_iin_is_not_blocked_or_review(self):
+        self.assertFalse(is_blocked("111111111111"))
+        self.assertFalse(needs_review("111111111111"))
 
 
 class AntifraudAPITestCase(APITestCase):
