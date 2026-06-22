@@ -66,9 +66,25 @@ class RegisterSerializer(serializers.ModelSerializer):
             "repeat_password",
             "role",
         )
+        extra_kwargs = {
+            "email": {"validators": []},
+            "iin": {"validators": []},
+        }
+
+    def validate_email(self, value):
+        email = User.objects.normalize_email(value)
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError(
+                "Пользователь с таким email уже существует."
+            )
+        return email
 
     def validate_iin(self, value):
         validate_iin(value)
+        if User.objects.filter(iin=value).exists():
+            raise serializers.ValidationError(
+                "Пользователь с таким ИИН уже зарегистрирован."
+            )
         return value
 
     def validate_role(self, value):

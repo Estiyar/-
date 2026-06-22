@@ -96,6 +96,25 @@ class RegisterAPITestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("iin", response.data)
+        self.assertEqual(
+            response.data["iin"][0],
+            "Пользователь с таким ИИН уже зарегистрирован.",
+        )
+
+    def test_register_duplicate_email_rejected(self):
+        self.client.post(self.url, self._payload(), format="json")
+        response = self.client.post(
+            self.url,
+            self._payload(email="ivan@example.com", iin="870308301456"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+        self.assertEqual(
+            response.data["email"][0],
+            "Пользователь с таким email уже существует.",
+        )
 
     def test_register_succeeds_with_invalid_token_header(self):
         response = self.client.post(

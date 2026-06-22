@@ -9,6 +9,21 @@ export function mediaUrl(path) {
   return `${MEDIA_BASE}${path}`
 }
 
+export function parseApiFieldErrors(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {}
+  const fields = {}
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'detail') continue
+    if (key === 'non_field_errors') {
+      if (Array.isArray(value) && value[0]) fields._form = value[0]
+      continue
+    }
+    if (Array.isArray(value) && value[0]) fields[key] = value[0]
+    else if (typeof value === 'string' && value) fields[key] = value
+  }
+  return fields
+}
+
 export function parseApiError(data, fallback = 'Запрос не выполнен.') {
   if (!data) return fallback
   if (typeof data === 'string') return data

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 
-const inputClassName =
+const defaultInputClassName =
   'w-full rounded-2xl border border-sky-100 px-4 py-3 pr-12 text-sm outline-none focus:border-teal-500'
 
 export default function PasswordInput({
@@ -10,6 +10,7 @@ export default function PasswordInput({
   placeholder,
   required = false,
   minLength,
+  className = defaultInputClassName,
 }) {
   const [visible, setVisible] = useState(false)
 
@@ -22,7 +23,7 @@ export default function PasswordInput({
         onChange={onChange}
         required={required}
         minLength={minLength}
-        className={inputClassName}
+        className={className}
       />
       <button
         type="button"
